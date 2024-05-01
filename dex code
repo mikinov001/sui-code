@@ -1,0 +1,46 @@
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract SuiDEX {
+    struct Order {
+        address trader;
+        uint256 amount;
+        uint256 price;
+    }
+
+    mapping(address => mapping(uint256 => Order)) public buyOrders;
+    mapping(address => mapping(uint256 => Order)) public sellOrders;
+
+    event BuyOrderPlaced(address indexed token, uint256 indexed orderId, address indexed trader, uint256 amount, uint256 price);
+    event SellOrderPlaced(address indexed token, uint256 indexed orderId, address indexed trader, uint256 amount, uint256 price);
+    event TradeExecuted(address indexed token, uint256 indexed buyOrderId, uint256 indexed sellOrderId, address buyer, address seller, uint256 amount, uint256 price);
+
+    function placeBuyOrder(address _token, uint256 _orderId, uint256 _amount, uint256 _price) external {
+        buyOrders[_token][_orderId] = Order(msg.sender, _amount, _price);
+        emit BuyOrderPlaced(_token, _orderId, msg.sender, _amount, _price);
+    }
+
+    function placeSellOrder(address _token, uint256 _orderId, uint256 _amount, uint256 _price) external {
+        require(IERC20(_token).allowance(msg.sender, address(this)) >= _amount, "Please approve the contract to spend tokens on your behalf.");
+        sellOrders[_token][_orderId] = Order(msg.sender, _amount, _price);
+        emit SellOrderPlaced(_token, _orderId, msg.sender, _amount, _price);
+    }
+
+    function executeTrade(address _token, uint256 _buyOrderId, uint256 _sellOrderId, uint256 _amount) external {
+        require(buyOrders[_token][_buyOrderId].amount >= _amount, "Insufficient buy order amount");
+        require(sellOrders[_token][_sellOrderId].amount >= _amount, "Insufficient sell order amount");
+
+        uint256 totalPrice = _amount * buyOrders[_token][_buyOrderId].price;
+
+        require(address(this).balance >= totalPrice, "Contract has insufficient Ether to cover the transfer.");
+
+        payable(buyOrders[_token][_buyOrderId].trader).transfer(totalPrice);
+        IERC20(_token).transferFrom(sellOrders[_token][_sellOrderId].trader, buyOrders[_token][_buyOrderId].trader, _amount);
+
+        buyOrders[_token][_buyOrderId].amount -= _amount;
+        sellOrders[_token][_sellOrderId].amount -= _amount;
+
+        emit TradeExecuted(_token, _buyOrderId, _sellOrderId, buyOrders[_token][_buyOrderId].trader, sellOrders[_token][_sellOrderId].trader, _amount, buyOrders[_token][_buyOrderId].price);
+    }
+}
