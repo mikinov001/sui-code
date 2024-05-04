@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Decentralized Exchange</title>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+    <script>
+        async function init() {
+            if (window.ethereum) {
+                window.web3 = new Web3(window.ethereum);
+                try {
+                    await window.ethereum.enable();
+                    const accounts = await web3.eth.getAccounts();
+                    document.getElementById("account").innerText = "Connected Account: " + accounts[0];
+                    const networkId = await web3.eth.net.getId();
+                    const contractAddress = "<CONTRACT_ADDRESS>"; // Insert deployed contract address
+                    window.contract = new web3.eth.Contract(<CONTRACT_ABI>, contractAddress);
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                console.error("Metamask not detected!");
+            }
+        }
+
+        async function buy() {
+            const amount = parseInt(document.getElementById("buyAmount").value);
+            await window.contract.methods.buy().send({ value: web3.utils.toWei(amount.toString(), "ether") });
+        }
+
+        async function sell() {
+            const amount = parseInt(document.getElementById("sellAmount").value);
+            await window.contract.methods.sell(amount).send();
+        }
+    </script>
+</head>
+<body onload="init()">
+    <h1>Decentralized Exchange</h1>
+    <p id="account">Connected Account: </p>
+    <h2>Buy Tokens</h2>
+    <input type="number" id="buyAmount" placeholder="Enter amount in Ether">
+    <button onclick="buy()">Buy</button>
+    <h2>Sell Tokens</h2>
+    <input type="number" id="sellAmount" placeholder="Enter amount in Tokens">
+    <button onclick="sell()">Sell</button>
+</body>
+</html>
